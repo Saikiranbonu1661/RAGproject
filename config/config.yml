@@ -1,0 +1,88 @@
+# RAG Document QA System Configuration
+# All configuration settings in one place
+
+# Text Splitting Configuration
+text_splitter:
+  chunk_size: 100               # Tokens (tiktoken-based) - smaller = more precise retrieval
+  chunk_overlap: 30            # Token overlap between chunks (20% overlap recommended)
+  separators:                  # Hierarchical separators for splitting
+    - "\n\n"                   # Paragraph breaks (highest priority)
+    - "\n"                     # Line breaks
+    - " "                      # Word boundaries
+    - ""                       # Character level (fallback)
+
+# Embedding Models Configuration
+embeddings:
+  default_model: "sentence-transformers/all-MiniLM-L6-v2"  # Fast, 384 dimensions
+  sbert_model: "BAAI/bge-base-en-v1.5"  # 768 dimensions, best quality
+  device: "cpu"                # cpu, cuda, mps (for Apple Silicon)
+  
+# Language Model Configuration
+llm:
+  # OpenAI Configuration (Custom Proxy)
+  use_openai: true              # Use OpenAI for generation
+  api_key: ""           # Your OpenAI API key
+  model: "gpt-4.1-nano"           # Model to use (custom proxy models: gpt-5, gpt-5-nano)
+  base_url: null                # Optional: Set custom base_url for proxy (e.g., "http://your-proxy/v1")
+  
+  # Generation Parameters
+  params:
+    max_tokens: 1000      # Limit response length (allows ~50-100 words with buffer)
+    temperature: 0
+
+# Retrieval Configuration
+retrieval:
+  top_k: 3                     # Number of chunks to retrieve
+  search_type: "similarity"    # similarity, mmr
+  
+# Vector Store Configuration
+vector_store:
+  faiss:
+    index_path: "data/faiss_index"
+    save_index: true
+  
+  elasticsearch:
+    es_url: "http://localhost:9200"
+    index_name: "rag_pdf_chunks_v1"
+    batch_size: 100
+    
+# Document Processing Configuration
+document_processing:
+  supported_formats:
+    - ".pdf"
+    - ".txt"
+    - ".docx"
+    - ".md"
+  use_advanced_loader: true    # Use FileIoDataLoader with text cleaning
+  
+# Regex Patterns for Text Cleaning
+text_cleaning:
+  normalize_whitespace: true   # Multiple spaces → single space
+  normalize_newlines: true     # Multiple \n → single \n
+  remove_special_chars: true   # Remove non-standard characters
+  
+# Metadata Configuration (Simplified)
+# Only essential metadata fields:
+# - content_type: 'file'
+# - file_name: name of the file
+# - timestamp: ISO format timestamp
+# - source: full file path
+  
+# Logging Configuration
+logging:
+  level: "INFO"                # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
+  file: null                   # Set to file path to enable file logging
+  
+# UI Configuration
+ui:
+  streamlit:
+    port: 8501
+    host: "localhost"
+    
+# System Configuration
+system:
+  data_dir: "data"
+  documents_dir: "data/documents"
+  sample_docs_dir: "data/sample_docs"
+

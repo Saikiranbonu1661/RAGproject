@@ -1,0 +1,7 @@
+
+
+1. select a domain before preparing a Q/A RAG
+2. once selected collect all the pdf's related to that concept.
+3. chunk them and update in elasticsearch
+4. now initialize llm with openai and run the service
+5. expose the ui with streamlit

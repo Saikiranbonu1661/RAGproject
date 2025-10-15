@@ -1,0 +1,32 @@
+{
+  "rag_pdf_chunks_v1": {
+      "mappings": {
+          "properties": {
+              "metadata": {
+                  "properties": {
+                      "content_type": {
+                          "type": "keyword"
+                      },
+                      "file_name": {
+                          "type": "keyword"
+                      },
+                      "source": {
+                          "type": "text"
+                      },
+                      "timestamp": {
+                          "type": "date"
+                      }
+                  }
+              },
+              "text": {
+                  "type": "text",
+                  "analyzer": "standard"
+              },
+              "vector_field": {
+                  "type": "dense_vector",
+                  "dims": 768
+              }
+          }
+      }
+  }
+}
