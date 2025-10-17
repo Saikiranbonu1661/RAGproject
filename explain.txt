@@ -1,0 +1,40 @@
+to create a project:
+
+1. install the dependencies
+
+things to install for a project to run
+(poetry, pyproject.toml) / requirements.txt
+
+here we are using requirements.txt.
+    To install command - pip install -r requirements.txt
+        if pip is not there you have to install
+
+if we use poetry:
+    pyproject.toml -> deps are there
+    pip install poetry
+    poetry install
+
+About project
+
+RAG
+
+steps: 
+    ingestion
+    retrieval
+    generation
+
+ingestion:
+    given data -> chunks -> generate vector -> insert into db
+retrival:
+    user inputs text -> generate vector -> do cosine similarity on db -> get the relavant docs
+generation:
+    used those docs -> create a prompt -> pass the question, similar docs fetched from db along with prompt -> output
+
+
+Things to learn:
+
+    1. terminal commands like cd, ls etc....
+    2. git and github? how to use? try with a sample project
+    3. embeddings, similarity, semantic search, cosine similarity ....
+
+
