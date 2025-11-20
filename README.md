@@ -1,266 +1,265 @@
-# 📚 Data-Driven Document QA Using RAG and Vector Embeddings
+# 📚 RAG Document QA System
 
-A comprehensive Retrieval-Augmented Generation (RAG) system that combines document retrieval with language models to provide accurate, context-aware answers based on your documents.
-
-## 🎯 Abstract
-
-This project develops a RAG system using **free resources only**: Hugging Face transformers, LangChain, and FAISS. The system can ingest documents (PDFs, DOCX, TXT, MD), convert them into vector embeddings, and store them in a vector database for fast semantic search. When users ask questions, the system retrieves relevant information and uses a Large Language Model to generate precise, context-aware answers.
-
-Unlike standard chatbots that rely on pre-trained knowledge, this system answers based on provided documents, making it more reliable and reducing hallucinations. The project demonstrates core Data Science techniques: text preprocessing, embeddings, similarity search, and NLP integration.
+A production-ready Retrieval-Augmented Generation (RAG) system with **two interfaces**: Legacy Streamlit and Modern FastAPI + React full-stack application.
 
 ## 🌟 Features
 
-- **📄 Multi-format Document Support**: PDF, DOCX, TXT, Markdown
-- **🧠 Semantic Search**: Vector embeddings using Sentence Transformers
-- **🤖 AI-Powered Answers**: Language model integration for answer generation
-- **🌐 Web Interface**: User-friendly Streamlit application
-- **📊 Analytics & Evaluation**: Performance metrics and system monitoring
-- **⚙️ Configurable**: Flexible parameters for different use cases
-- **💰 100% Free Resources**: No paid APIs or services required
+- **📤 Dynamic Document Upload** - Upload PDFs, DOCX, TXT, MD files on-the-fly
+- **🤖 AI-Powered Q&A** - OpenAI integration for intelligent answers
+- **🔍 Semantic Search** - Elasticsearch vector storage with BGE embeddings
+- **💬 Modern Chat UI** - React-based interface with real-time updates
+- **🔢 Token Tracking** - Monitor usage with detailed breakdown
+- **📚 Source Attribution** - See which documents were used
+- **🎨 Two UIs** - Choose Streamlit (simple) or FastAPI+React (production)
 
 ## 🏗️ Architecture
 
 ```
-📁 Project Structure
-├── src/rag_qa/              # Main package
-│   ├── core/                # Core system components
-│   │   ├── document_processor.py    # Document loading & processing
-│   │   └── rag_system.py           # Main RAG system
-│   ├── utils/               # Utility modules
-│   │   ├── config.py        # Configuration management
-│   │   ├── evaluation.py    # System evaluation
-│   │   └── helpers.py       # Helper functions
-│   └── ui/                  # User interfaces
-│       └── streamlit_app.py # Web interface
-├── data/                    # Data directory
-│   ├── documents/           # Input documents
-│   ├── faiss_index/         # Vector store
-│   └── sample_docs/         # Sample documents
-├── main.py                  # Entry point
-├── requirements.txt         # Dependencies
-└── README.md               # This file
+┌─────────────┐      HTTP/REST      ┌──────────────┐
+│   React     │ ◄──────────────────►│   FastAPI    │
+│  Frontend   │                     │   Backend    │
+│  (Port 3000)│                     │  (Port 8000) │
+└─────────────┘                     └──────────────┘
+                                           │
+                                           ▼
+                                    ┌──────────────┐
+                                    │Elasticsearch │
+                                    │  (Port 9200) │
+                                    └──────────────┘
+                                           │
+                                           ▼
+                                    ┌───────────────┐
+                                    │   OpenAI      │
+                                    │  gpt-4.1-nano │
+                                    └───────────────┘
 ```
 
-## 🔧 Technical Components
+## 📁 Project Structure
 
-### Core Technologies (All Free!)
-- **Sentence Transformers**: `all-MiniLM-L6-v2` for embeddings
-- **Microsoft DialoGPT**: Small/medium models for text generation
-- **FAISS**: CPU version for vector similarity search
-- **LangChain**: RAG pipeline orchestration
-- **Streamlit**: Web interface framework
-
-### Data Science Techniques
-- **Text Preprocessing**: Document parsing and cleaning
-- **Text Chunking**: Recursive character splitting with overlap
-- **Vector Embeddings**: Semantic representation of text
-- **Similarity Search**: Cosine similarity in vector space
-- **Retrieval-Augmented Generation**: Context-aware answer generation
+```
+sampleprojects/
+├── backend/              # FastAPI backend
+│   └── api.py           # RESTful API
+├── frontend/            # React frontend
+│   ├── src/
+│   │   ├── components/  # UI components
+│   │   ├── services/    # API integration
+│   │   └── App.js       # Main app
+│   └── package.json
+├── src/rag_qa/          # Core RAG system
+│   ├── core/
+│   │   ├── rag_openai.py       # OpenAI integration
+│   │   ├── es7_retriever.py    # Elasticsearch retrieval
+│   │   └── document_processor.py
+│   └── utils/
+├── config/
+│   └── config.yml       # Unified configuration
+├── requirements.txt     # All Python dependencies
+├── package.json         # Frontend dependencies
+├── app.py              # Streamlit UI (legacy)
+└── main.py             # Terminal interface
+```
 
 ## 🚀 Quick Start
 
-### 1. Installation
+### Prerequisites
+
+- Python 3.8+
+- Node.js 16+ and npm
+- Docker (for Elasticsearch)
+
+### Installation
 
 ```bash
-# Navigate to project directory
-cd sampleprojects
+# 1. Install Python dependencies
+pip install -r requirements.txt
 
-# Create and activate virtual environment
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# 2. Install Frontend dependencies
+npm install
 
-# Install dependencies
+# 3. Start Elasticsearch
+docker-compose up -d
+
+# 4. Configure API key
+# Edit config/config.yml and add your OpenAI API key
+```
+
+### Run the Application
+
+**Option 1: Full-Stack Web UI (Recommended)**
+
+```bash
+# Terminal 1 - Backend
+cd backend
+python3 api.py
+
+# Terminal 2 - Frontend
+npm start
+
+# Open http://localhost:3000
+```
+
+**Option 2: Terminal Interface**
+
+```bash
+python3 main.py
+```
+
+## 🔧 Configuration
+
+Edit `config/config.yml`:
+
+```yaml
+llm:
+  use_openai: true
+  api_key: "your-openai-api-key"
+  model: "gpt-4.1-nano"  # or gpt-4o-mini for cheaper
+  params:
+    max_tokens: 1000
+    temperature: 0
+
+vector_store:
+  elasticsearch:
+    es_url: "http://localhost:9200"
+    index_name: "rag_pdf_chunks_v1"
+
+retrieval:
+  top_k: 3  # Number of chunks to retrieve
+```
+
+## 📖 Documentation
+
+- **[INSTALL.md](INSTALL.md)** - Quick installation guide
+- **[README_FULLSTACK.md](README_FULLSTACK.md)** - Full-stack application guide
+- **[FASTAPI_REACT_SETUP.md](FASTAPI_REACT_SETUP.md)** - Detailed setup & troubleshooting
+
+## 🎯 Key Features
+
+- ✅ **Dynamic Document Upload** - Upload files on-the-fly
+- ✅ **Advanced Chat Interface** - Modern React UI
+- ✅ **Detailed Token Tracking** - Monitor usage
+- ✅ **Source Attribution** - Expandable sources
+- ✅ **Multi-Session Support** - Per-user isolation
+- ✅ **RESTful API** - Full API access
+- ✅ **Production Ready** - Scalable architecture
+
+## 🔧 Tech Stack
+
+**Backend:**
+- FastAPI - Modern Python web framework
+- LangChain - RAG pipeline orchestration
+- Elasticsearch - Vector storage & retrieval
+- OpenAI - Language model (gpt-4.1-nano, gpt-4o-mini)
+- Sentence Transformers - BGE embeddings (768-dim)
+
+**Frontend:**
+- React 18 - UI framework
+- Axios - HTTP client
+- react-dropzone - File uploads
+- react-markdown - Markdown rendering
+
+## 🎨 Screenshots
+
+**Modern React UI:**
+- Clean sidebar with document management
+- Real-time chat interface
+- Token usage display
+- Source attribution
+
+**Streamlit UI:**
+- Simple chat interface
+- Pre-indexed documents
+- Basic Q&A functionality
+
+## 📊 API Endpoints
+
+```
+POST   /api/session/create        - Create new session
+POST   /api/documents/upload      - Upload document
+POST   /api/query                 - Ask question
+GET    /api/session/{id}          - Get session info
+DELETE /api/session/{id}          - Delete session
+```
+
+**API Docs:** http://localhost:8000/docs
+
+## 🔍 How It Works
+
+### 1. Document Ingestion
+- Upload PDF/DOCX/TXT/MD files
+- Process with UnstructuredFileIOLoader
+- Split into chunks (tiktoken-based, 100 tokens)
+- Generate 768-dim BGE embeddings
+- Store in Elasticsearch
+
+### 2. Query Processing
+- User asks a question
+- Generate query embedding
+- Retrieve top-K similar chunks (cosine similarity)
+- Build context from retrieved chunks
+
+### 3. Answer Generation
+- Send context + question to OpenAI
+- Generate concise answer (max 50 words)
+- Track token usage (prompt + completion)
+- Display sources used
+
+## 🐛 Troubleshooting
+
+**Elasticsearch not running:**
+```bash
+docker-compose up -d
+curl http://localhost:9200
+```
+
+**Module not found:**
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Run the System
-
+**Port already in use:**
 ```bash
-# Activate virtual environment
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Run the system (defaults to demo mode)
-python main.py
+lsof -ti:8000 | xargs kill -9  # Backend
+lsof -ti:3000 | xargs kill -9  # Frontend
 ```
 
-That's it! The system will:
-- ✅ Create sample documents automatically
-- ✅ Initialize the RAG system
-- ✅ Process documents and create embeddings
-- ✅ Ask sample questions and show answers
-- ✅ Display enhanced logs with [filename:line_number]
+**node_modules being committed:**
+- Already added to `.gitignore`
+- Run: `git rm -r --cached node_modules`
 
-## 📖 Adding Your Own Documents
+## 🚀 Production Deployment
 
-Want to use your own PDF or documents instead of the sample files?
-
-### Option 1: Add to Sample Documents Folder
-
+**Backend:**
 ```bash
-# Copy your PDF to the documents folder
-cp /path/to/your/document.pdf data/sample_docs/
-
-# Run the system
-python main.py
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker backend.api:app
 ```
 
-### Option 2: Use a Custom Folder
-
-```python
-from src.rag_qa import RAGDocumentQA
-
-# Initialize system
-rag = RAGDocumentQA()
-
-# Ingest your documents from any folder
-rag.ingest_documents("path/to/your/documents/")
-
-# Ask questions about your documents
-result = rag.answer_question("What is this document about?")
-print(f"Answer: {result['answer']}")
-```
-
-**Supported formats:** PDF, DOCX, TXT, Markdown
-
-## 🎛️ Advanced Options
-
-### Debug Mode with Detailed Logs
-
+**Frontend:**
 ```bash
-python main.py --log-level DEBUG
+cd frontend && npm run build
+# Serve build/ with nginx
 ```
-
-### Save Logs to File
-
-```bash
-python main.py --log-level INFO --log-file rag_system.log
-```
-
-### Different Modes
-
-```bash
-python main.py demo          # Demo mode (default)
-python main.py web           # Web interface (Streamlit)
-python main.py interactive   # Interactive Q&A mode
-```
-
-## 🎯 Use Cases
-
-### Healthcare
-- **Medical Literature Review**: Query research papers and clinical guidelines
-- **Patient Information**: Extract relevant information from medical records
-- **Drug Information**: Search pharmaceutical documentation
-
-### Finance
-- **Regulatory Compliance**: Query financial regulations and policies
-- **Market Research**: Analyze financial reports and market data
-- **Risk Assessment**: Review risk management documents
-
-### Education
-- **Course Materials**: Search through textbooks and lecture notes
-- **Research Assistance**: Query academic papers and publications
-- **Study Guides**: Extract key information from educational content
-
-### Enterprise
-- **Knowledge Management**: Search internal documentation and policies
-- **Technical Documentation**: Query API docs, manuals, and guides
-- **Customer Support**: Find relevant information from support materials
-
-## 🔬 Data Science Applications
-
-This project demonstrates several key Data Science concepts:
-
-### 1. Natural Language Processing
-- **Text Preprocessing**: Cleaning and normalizing document content
-- **Tokenization**: Breaking text into meaningful units
-- **Embeddings**: Converting text to numerical representations
-
-### 2. Information Retrieval
-- **Vector Similarity**: Finding semantically similar content
-- **Ranking**: Ordering results by relevance
-- **Query Expansion**: Enhancing search queries
-
-### 3. Machine Learning
-- **Unsupervised Learning**: Clustering similar documents
-- **Similarity Metrics**: Cosine similarity for vector comparison
-- **Model Evaluation**: Measuring system performance
-
-### 4. System Design
-- **Scalability**: Efficient vector storage and retrieval
-- **Modularity**: Separated concerns and reusable components
-- **Configuration**: Flexible parameter management
-
-## 🛠️ Development
-
-### Adding New Document Types
-
-```python
-# In src/rag_qa/core/document_processor.py
-def load_custom_format(self, file_path: str) -> str:
-    """Load custom document format."""
-    # Implement custom loading logic
-    return extracted_text
-```
-
-### Custom Embedding Models
-
-```python
-# In src/rag_qa/core/rag_system.py
-rag = RAGDocumentQA(
-    embedding_model_name="your-custom-model",
-    # other parameters...
-)
-```
-
-### Extending Evaluation Metrics
-
-```python
-# In src/rag_qa/utils/evaluation.py
-def custom_evaluation_metric(results):
-    """Implement custom evaluation logic."""
-    # Your evaluation code here
-    return metric_value
-```
-
-## 🔍 Troubleshooting
-
-### Module Not Found Error
-Make sure you activated the virtual environment:
-```bash
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-python main.py
-```
-
-### Out of Memory
-The system will download AI models on first run. This is normal and only happens once. Models are cached for future use.
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Add your improvements
-4. Include tests and documentation
-5. Submit a pull request
+2. Create feature branch
+3. Commit changes
+4. Push to branch
+5. Open pull request
 
 ## 📄 License
 
-This project is open-source and available under the MIT License.
+MIT License - See LICENSE file
 
-## 🙏 Acknowledgments
+## 🙏 Credits
 
-- **Hugging Face** for free transformer models
-- **Facebook AI** for FAISS vector search
-- **LangChain** for RAG framework
-- **Streamlit** for web interface framework
-- **Sentence Transformers** for embedding models
-
-## 📚 References
-
-1. [Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks](https://arxiv.org/abs/2005.11401)
-2. [Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks](https://arxiv.org/abs/1908.10084)
-3. [LangChain Documentation](https://docs.langchain.com/)
-4. [FAISS: A Library for Efficient Similarity Search](https://github.com/facebookresearch/faiss)
+- **OpenAI** - Language models
+- **Elasticsearch** - Vector storage
+- **LangChain** - RAG framework
+- **React** - Frontend framework
+- **FastAPI** - Backend framework
 
 ---
 
-**🚀 Ready to build intelligent document QA systems with free resources!** 
+**Made with ❤️ using FastAPI + React + OpenAI**
