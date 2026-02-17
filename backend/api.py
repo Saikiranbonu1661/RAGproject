@@ -27,12 +27,26 @@ from src.rag_qa.utils.config_loader import (
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from elasticsearch import Elasticsearch
 
+# Import logging configuration
+from backend.logging_config import get_logger, setup_logging
+from backend.middleware import RequestLoggingMiddleware
+
+# Setup logging
+logger = setup_logging(
+    log_file="logs/rag_api.log",
+    log_level="DEBUG",
+    console_output=True
+)
+
 # Initialize FastAPI
 app = FastAPI(
     title="RAG Document QA API",
     description="Dynamic document upload and intelligent Q&A system",
     version="1.0.0"
 )
+
+# Add Request Logging Middleware (MUST be before CORS)
+app.add_middleware(RequestLoggingMiddleware)
 
 # CORS configuration
 app.add_middleware(
@@ -42,6 +56,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+logger.info("="*80)
+logger.info("RAG API Server Starting...")
+logger.info("="*80)
 
 # Global state (in production, use Redis or database)
 sessions = {}  # session_id -> {documents, retriever, rag}
@@ -77,6 +95,7 @@ class SessionResponse(BaseModel):
 def get_or_create_session(session_id: str) -> dict:
     """Get or create a session."""
     if session_id not in sessions:
+        logger.info(f"Creating new session: {session_id}")
         sessions[session_id] = {
             "documents": [],
             "chunks": [],
@@ -85,11 +104,14 @@ def get_or_create_session(session_id: str) -> dict:
             "embeddings": None,
             "es_client": None
         }
+    else:
+        logger.debug(f"Retrieved existing session: {session_id}")
     return sessions[session_id]
 
 
 def initialize_embeddings():
     """Initialize embeddings model (shared across sessions)."""
+    logger.debug("Initializing embeddings model...")
     embeddings_config = get_embeddings_config()
     device = embeddings_config.get('device', 'cpu')
     
@@ -97,20 +119,29 @@ def initialize_embeddings():
         import torch
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
+    model_name = embeddings_config.get('sbert_model', 'BAAI/bge-base-en-v1.5')
+    logger.info(f"Loading embeddings model: {model_name} on device: {device}")
+    
     return HuggingFaceEmbeddings(
-        model_name=embeddings_config.get('sbert_model', 'BAAI/bge-base-en-v1.5'),
+        model_name=model_name,
         model_kwargs={'device': device}
     )
 
 
 def initialize_elasticsearch():
     """Initialize Elasticsearch client."""
+    logger.debug("Initializing Elasticsearch client...")
     es_config = get_elasticsearch_config()
-    es_client = Elasticsearch([es_config['es_url']])
+    es_url = es_config['es_url']
+    
+    logger.info(f"Connecting to Elasticsearch at: {es_url}")
+    es_client = Elasticsearch([es_url])
     
     if not es_client.ping():
+        logger.error(f"Cannot connect to Elasticsearch at {es_url}")
         raise ConnectionError("Cannot connect to Elasticsearch")
     
+    logger.info("Elasticsearch connection successful")
     return es_client, es_config['index_name']
 
 
@@ -119,10 +150,12 @@ def initialize_elasticsearch():
 @app.get("/")
 async def root():
     """Health check endpoint."""
+    logger.debug("Health check endpoint called")
     return {
         "status": "online",
         "service": "RAG Document QA API",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "active_sessions": len(sessions)
     }
 
 
@@ -131,6 +164,8 @@ async def create_session():
     """Create a new session."""
     session_id = str(uuid.uuid4())
     get_or_create_session(session_id)
+    
+    logger.info(f"New session created successfully: {session_id}")
     
     return {
         "session_id": session_id,
@@ -148,6 +183,9 @@ async def upload_document(
     # Create session if not provided
     if not session_id:
         session_id = str(uuid.uuid4())
+        logger.info(f"No session_id provided, created new session: {session_id}")
+    
+    logger.info(f"Document upload started: {file.filename} (size: {file.size if hasattr(file, 'size') else 'unknown'})")
     
     session = get_or_create_session(session_id)
     
@@ -156,6 +194,7 @@ async def upload_document(
     file_ext = os.path.splitext(file.filename)[1].lower()
     
     if file_ext not in allowed_extensions:
+        logger.warning(f"Unsupported file type attempted: {file_ext}")
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}"
@@ -163,12 +202,16 @@ async def upload_document(
     
     try:
         # Save file temporarily
+        logger.debug(f"Saving temporary file: {file.filename}")
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
             content = await file.read()
             tmp_file.write(content)
             tmp_file_path = tmp_file.name
         
+        logger.info(f"File saved to temp location: {tmp_file_path} ({len(content)} bytes)")
+        
         # Process document
+        logger.debug("Loading text splitter configuration...")
         text_splitter_config = get_text_splitter_config()
         file_loader = FileIoDataLoader(
             chunk_size=text_splitter_config['chunk_size'],
@@ -176,6 +219,7 @@ async def upload_document(
             separators=text_splitter_config['separators']
         )
         
+        logger.info(f"Processing document: {file.filename}")
         with open(tmp_file_path, 'rb') as f:
             chunks = file_loader.scrap_and_create_documents_for_file_data(
                 bytes_data=f,
@@ -183,8 +227,11 @@ async def upload_document(
                 file_name=file.filename
             )
         
+        logger.info(f"Document processed into {len(chunks)} chunks")
+        
         # Clean up temp file
         os.unlink(tmp_file_path)
+        logger.debug(f"Temporary file deleted: {tmp_file_path}")
         
         # Store document info
         doc_id = str(uuid.uuid4())
@@ -196,18 +243,25 @@ async def upload_document(
             "uploaded_at": datetime.now().isoformat()
         }
         
+        logger.debug(f"Document metadata created: {doc_info}")
+        
         session["documents"].append(doc_info)
         session["chunks"].extend(chunks)
         
+        logger.info(f"Session now has {len(session['documents'])} documents and {len(session['chunks'])} total chunks")
+        
         # Initialize or update retriever
         if session["embeddings"] is None:
+            logger.debug("Embeddings not initialized for session, initializing...")
             session["embeddings"] = initialize_embeddings()
         
         if session["es_client"] is None:
+            logger.debug("Elasticsearch client not initialized for session, initializing...")
             session["es_client"], index_name = initialize_elasticsearch()
         
         # Create session-specific index
         session_index = f"rag_session_{session_id}"
+        logger.info(f"Indexing documents to Elasticsearch index: {session_index}")
         
         # Index documents to Elasticsearch
         from langchain_elasticsearch import ElasticsearchStore
@@ -222,19 +276,26 @@ async def upload_document(
             es_connection=session["es_client"]
         )
         
+        logger.info(f"Successfully indexed {len(session['chunks'])} chunks to Elasticsearch")
+        
         # Create retriever
         retrieval_config = get_retrieval_config()
+        top_k = retrieval_config.get('top_k', 3)
+        logger.debug(f"Creating retriever with top_k={top_k}")
+        
         session["retriever"] = ES7ScriptScoreRetriever(
             es_client=session["es_client"],
             index_name=session_index,
             embedding_function=session["embeddings"],
-            top_k=retrieval_config.get('top_k', 3)
+            top_k=top_k
         )
         
         # Create RAG system
+        logger.debug("Initializing RAG system...")
         session["rag"] = RAGWithOpenAI(retriever=session["retriever"])
+        logger.info("RAG system initialized successfully")
         
-        return {
+        result = {
             "session_id": session_id,
             "document": doc_info,
             "message": f"Successfully processed {file.filename}",
@@ -242,7 +303,11 @@ async def upload_document(
             "total_chunks": len(session["chunks"])
         }
         
+        logger.info(f"Document upload completed successfully: {file.filename}")
+        return result
+        
     except Exception as e:
+        logger.error(f"Error processing document {file.filename}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
 
 
@@ -250,16 +315,28 @@ async def upload_document(
 async def query_documents(request: QueryRequest):
     """Query the uploaded documents."""
     
+    logger.info(f"Query received: '{request.question[:100]}...' (session: {request.session_id})")
+    
     if request.session_id not in sessions:
+        logger.warning(f"Query attempt with invalid session_id: {request.session_id}")
         raise HTTPException(status_code=404, detail="Session not found")
     
     session = sessions[request.session_id]
     
     if not session["rag"]:
+        logger.warning(f"Query attempt with no documents uploaded (session: {request.session_id})")
         raise HTTPException(status_code=400, detail="No documents uploaded yet")
     
     try:
+        logger.debug(f"Processing query with RAG system...")
         result = session["rag"].answer_question(request.question)
+        
+        logger.info(
+            f"Query processed successfully | "
+            f"Answer length: {len(result['answer'])} chars | "
+            f"Sources: {len(result['source_documents'])} | "
+            f"Tokens: {result.get('token_usage', {})}"
+        )
         
         return QueryResponse(
             answer=result["answer"],
@@ -268,6 +345,7 @@ async def query_documents(request: QueryRequest):
         )
         
     except Exception as e:
+        logger.error(f"Error processing query: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
 
 
@@ -275,10 +353,19 @@ async def query_documents(request: QueryRequest):
 async def get_session_info(session_id: str):
     """Get session information."""
     
+    logger.debug(f"Session info requested for: {session_id}")
+    
     if session_id not in sessions:
+        logger.warning(f"Session info request for non-existent session: {session_id}")
         raise HTTPException(status_code=404, detail="Session not found")
     
     session = sessions[session_id]
+    
+    logger.info(
+        f"Session info retrieved | "
+        f"Documents: {len(session['documents'])} | "
+        f"Chunks: {len(session['chunks'])}"
+    )
     
     return SessionResponse(
         session_id=session_id,
@@ -291,7 +378,10 @@ async def get_session_info(session_id: str):
 async def delete_session(session_id: str):
     """Delete a session and cleanup."""
     
+    logger.info(f"Session deletion requested: {session_id}")
+    
     if session_id not in sessions:
+        logger.warning(f"Delete attempt for non-existent session: {session_id}")
         raise HTTPException(status_code=404, detail="Session not found")
     
     session = sessions[session_id]
@@ -300,13 +390,18 @@ async def delete_session(session_id: str):
     try:
         if session["es_client"]:
             session_index = f"rag_session_{session_id}"
+            logger.debug(f"Checking for Elasticsearch index: {session_index}")
+            
             if session["es_client"].indices.exists(index=session_index):
+                logger.info(f"Deleting Elasticsearch index: {session_index}")
                 session["es_client"].indices.delete(index=session_index)
+                logger.info(f"Index deleted successfully: {session_index}")
     except Exception as e:
-        print(f"Error cleaning up ES index: {e}")
+        logger.error(f"Error cleaning up ES index: {e}", exc_info=True)
     
     # Remove session
     del sessions[session_id]
+    logger.info(f"Session deleted successfully: {session_id}")
     
     return {"message": "Session deleted successfully"}
 
@@ -315,7 +410,10 @@ async def delete_session(session_id: str):
 async def delete_document(session_id: str, document_id: str):
     """Delete a specific document from session."""
     
+    logger.info(f"Document deletion requested | Session: {session_id} | Document: {document_id}")
+    
     if session_id not in sessions:
+        logger.warning(f"Delete document attempt for non-existent session: {session_id}")
         raise HTTPException(status_code=404, detail="Session not found")
     
     session = sessions[session_id]
@@ -328,9 +426,11 @@ async def delete_document(session_id: str, document_id: str):
             break
     
     if not doc_to_remove:
+        logger.warning(f"Delete attempt for non-existent document: {document_id}")
         raise HTTPException(status_code=404, detail="Document not found")
     
     session["documents"].remove(doc_to_remove)
+    logger.info(f"Document removed successfully: {doc_to_remove['filename']}")
     
     # Note: In production, you'd need to re-index without this document
     # For now, we'll just remove it from the list
@@ -340,5 +440,14 @@ async def delete_document(session_id: str, document_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    
+    logger.info("Starting Uvicorn server on http://0.0.0.0:8000")
+    logger.info("Press CTRL+C to quit")
+    
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=8000,
+        log_level="info"
+    )
 

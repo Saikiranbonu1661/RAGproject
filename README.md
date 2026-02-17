@@ -18,7 +18,7 @@ A production-ready Retrieval-Augmented Generation (RAG) system with **two interf
 ┌─────────────┐      HTTP/REST      ┌──────────────┐
 │   React     │ ◄──────────────────►│   FastAPI    │
 │  Frontend   │                     │   Backend    │
-│  (Port 3000)│                     │  (Port 8000) │
+│ (Port 3000) │                     │  (Port 8000) │
 └─────────────┘                     └──────────────┘
                                            │
                                            ▼

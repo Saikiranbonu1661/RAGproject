@@ -98,10 +98,25 @@ class ConfigLoader:
         }
     
     def get_retrieval_config(self) -> Dict[str, Any]:
-        """Get retrieval configuration."""
+        """Get retrieval configuration including hybrid search and reranking settings."""
         return {
             'top_k': self.get('retrieval.top_k', 5),
-            'search_type': self.get('retrieval.search_type', 'similarity')
+            'top_k_initial': self.get('retrieval.top_k_initial', 20),
+            'search_type': self.get('retrieval.search_type', 'similarity'),
+            # Hybrid search configuration
+            'hybrid_search': {
+                'enabled': self.get('retrieval.hybrid_search.enabled', False),
+                'alpha': self.get('retrieval.hybrid_search.alpha', 0.5),
+                'use_rrf': self.get('retrieval.hybrid_search.use_rrf', True),
+                'rrf_k': self.get('retrieval.hybrid_search.rrf_k', 60)
+            },
+            # Reranking configuration
+            'reranking': {
+                'enabled': self.get('retrieval.reranking.enabled', False),
+                'model': self.get('retrieval.reranking.model', 'cross-encoder/ms-marco-MiniLM-L-6-v2'),
+                'device': self.get('retrieval.reranking.device', 'cpu'),
+                'batch_size': self.get('retrieval.reranking.batch_size', 32)
+            }
         }
     
     def get_elasticsearch_config(self) -> Dict[str, Any]:

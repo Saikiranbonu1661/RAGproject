@@ -2,11 +2,15 @@
 RAG System with OpenAI Generation
 
 Uses Elasticsearch/FAISS for retrieval and OpenAI API for generation.
+Supports advanced RAG features:
+- Hybrid Search (BM25 + Semantic)
+- Cross-Encoder Reranking
+
 Configuration loaded from config/config.yml.
 """
 
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -16,20 +20,29 @@ from langchain_openai import ChatOpenAI
 
 # Local imports
 from ..utils.config_loader import get_llm_config, get_retrieval_config
+from .reranker import create_reranker, CrossEncoderReranker, DummyReranker
 
 # Setup logging
 logger = logging.getLogger(__name__)
 
 
 class RAGWithOpenAI:
-    """RAG system using OpenAI for generation."""
+    """
+    Advanced RAG system using OpenAI for generation.
     
-    def __init__(self, retriever=None):
+    Features:
+    - Hybrid Search support (BM25 + Semantic via HybridRetriever)
+    - Cross-Encoder Reranking for improved precision
+    - Token usage tracking with reasoning token breakdown
+    """
+    
+    def __init__(self, retriever=None, enable_reranking: Optional[bool] = None):
         """
         Initialize RAG with OpenAI.
         
         Args:
-            retriever: LangChain retriever object (from FAISS or Elasticsearch)
+            retriever: LangChain retriever object (from FAISS, Elasticsearch, or HybridRetriever)
+            enable_reranking: Override config to enable/disable reranking. None uses config value.
         """
         self.retriever = retriever
         self.llm_config = get_llm_config()
@@ -37,6 +50,9 @@ class RAGWithOpenAI:
         
         # Initialize OpenAI LLM
         self._initialize_openai()
+        
+        # Initialize Reranker
+        self._initialize_reranker(enable_reranking)
         
         logger.info("RAG with OpenAI initialized successfully")
     
@@ -75,8 +91,34 @@ class RAGWithOpenAI:
             logger.error(f"Error initializing OpenAI: {e}")
             self.llm = None
     
+    def _initialize_reranker(self, enable_reranking: Optional[bool] = None):
+        """Initialize the cross-encoder reranker based on config."""
+        rerank_config = self.retrieval_config.get('reranking', {})
+        
+        # Use override if provided, otherwise use config
+        enabled = enable_reranking if enable_reranking is not None else rerank_config.get('enabled', False)
+        
+        if enabled:
+            try:
+                self.reranker = create_reranker(
+                    enabled=True,
+                    model_name=rerank_config.get('model', 'cross-encoder/ms-marco-MiniLM-L-6-v2'),
+                    top_k=self.retrieval_config.get('top_k', 5),
+                    device=rerank_config.get('device', 'cpu')
+                )
+                self.reranking_enabled = True
+                logger.info(f"Cross-encoder reranking enabled with model: {rerank_config.get('model')}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize reranker: {e}. Disabling reranking.")
+                self.reranker = None
+                self.reranking_enabled = False
+        else:
+            self.reranker = None
+            self.reranking_enabled = False
+            logger.info("Reranking disabled")
+    
     def set_retriever(self, retriever):
-        """Set the retriever (FAISS or Elasticsearch)."""
+        """Set the retriever (FAISS, Elasticsearch, or HybridRetriever)."""
         self.retriever = retriever
         logger.info("Retriever set successfully")
     
@@ -98,18 +140,37 @@ class RAGWithOpenAI:
         
         try:
             # Step 1: Retrieve relevant documents
+            # If reranking is enabled, fetch more initially (top_k_initial)
+            # Otherwise, just fetch top_k
             top_k = self.retrieval_config.get('top_k', 5)
-            docs = self.retriever.get_relevant_documents(question)[:top_k]
+            top_k_initial = self.retrieval_config.get('top_k_initial', 20) if self.reranking_enabled else top_k
+            
+            docs = self.retriever.get_relevant_documents(question)[:top_k_initial]
             
             if not docs:
                 logger.warning(f"No relevant documents found for query")
                 return {
                     "question": question,
                     "answer": "No relevant documents found.",
-                    "source_documents": []
+                    "source_documents": [],
+                    "retrieval_info": {
+                        "method": "hybrid" if hasattr(self.retriever, 'use_rrf') else "semantic",
+                        "reranking_applied": False,
+                        "initial_retrieved": 0,
+                        "final_count": 0
+                    }
                 }
             
             logger.debug(f"Retrieved {len(docs)} documents from vector store")
+            
+            # Step 1.5: Apply reranking if enabled
+            initial_count = len(docs)
+            if self.reranking_enabled and self.reranker:
+                docs = self.reranker.rerank(question, docs, return_scores=True)
+                logger.info(f"Reranked {initial_count} docs to {len(docs)} (top_k={top_k})")
+            else:
+                # Just truncate to top_k if no reranking
+                docs = docs[:top_k]
             
             # Step 2: Build context from retrieved documents
             context_parts = []
@@ -178,6 +239,11 @@ Answer:"""
                 token_usage = response.response_metadata['token_usage']
             
             # Step 5: Format response
+            # Determine retrieval method from document metadata
+            retrieval_method = "semantic"  # default
+            if docs and docs[0].metadata.get('retrieval_method'):
+                retrieval_method = docs[0].metadata.get('retrieval_method')
+            
             result = {
                 "question": question,
                 "answer": answer,
@@ -185,11 +251,19 @@ Answer:"""
                     {
                         "content": doc.page_content[:300] + "..." if len(doc.page_content) > 300 else doc.page_content,
                         "source": doc.metadata.get("file_name", "Unknown"),
-                        "type": doc.metadata.get("content_type", "file")
+                        "type": doc.metadata.get("content_type", "file"),
+                        "rerank_score": doc.metadata.get("rerank_score"),  # Include if available
+                        "fusion_score": doc.metadata.get("fusion_score")   # Include if available
                     }
                     for doc in docs
                 ],
-                "num_retrieved": len(docs)
+                "num_retrieved": len(docs),
+                "retrieval_info": {
+                    "method": retrieval_method,
+                    "reranking_applied": self.reranking_enabled,
+                    "initial_retrieved": initial_count,
+                    "final_count": len(docs)
+                }
             }
             
             # Add token usage if available
