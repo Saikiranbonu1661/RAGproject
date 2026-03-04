@@ -128,11 +128,9 @@ def ingest_pdf_to_elasticsearch(pdf_file_path):
         bge_embeddings,
         es_url=ES_URL,
         index_name=INDEX_NAME,
-        # IMPORTANT: Match the field name used in the curl command!
-        vector_query_field="vector_field", 
+        vector_query_field="vector_field",
         distance_strategy="COSINE",
-        # Using the existing client avoids creating a new connection instance
-        es_connection=es_client
+        client=es_client
     )
 
     print("-" * 60)

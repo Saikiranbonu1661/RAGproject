@@ -146,7 +146,7 @@ class RAGWithOpenAI:
             top_k = self.retrieval_config.get('top_k', 5)
             top_k_initial = self.retrieval_config.get('top_k_initial', 20) if self.reranking_enabled else top_k
             
-            docs = self.retriever.get_relevant_documents(question)[:top_k_initial]
+            docs = self.retriever.invoke(question)[:top_k_initial]
             
             if not docs:
                 logger.warning(f"No relevant documents found for query")

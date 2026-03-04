@@ -273,7 +273,7 @@ async def upload_document(
             index_name=session_index,
             vector_query_field="vector_field",
             distance_strategy="COSINE",
-            es_connection=session["es_client"]
+            client=session["es_client"]
         )
         
         logger.info(f"Successfully indexed {len(session['chunks'])} chunks to Elasticsearch")
