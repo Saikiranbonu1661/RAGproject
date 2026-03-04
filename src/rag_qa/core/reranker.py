@@ -8,7 +8,7 @@ relevance scores than bi-encoder similarity.
 
 import logging
 from typing import List, Optional, Tuple
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 logger = logging.getLogger(__name__)
 

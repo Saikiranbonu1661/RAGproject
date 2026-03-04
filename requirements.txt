@@ -2,28 +2,37 @@
 # =================================
 
 # LangChain for RAG pipeline
-langchain>=0.1.0
-langchain-community>=0.0.20
-langchain-openai>=0.0.5
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-openai>=0.3.0
+langchain-elasticsearch>=0.3.0
+langchain-huggingface>=0.3.0
+langchain-text-splitters>=0.3.0
 
 # Vector database and embeddings
-sentence-transformers>=2.2.2
+sentence-transformers>=5.0.0
 elasticsearch>=8.11.0
 
 # Document processing
-unstructured[pdf]>=0.10.0  # Includes PDF processing dependencies
-tiktoken>=0.5.0
+unstructured>=0.18.0
+PyPDF2>=3.0.0
+python-docx>=1.2.0
+beautifulsoup4>=4.12.0
+tiktoken>=0.12.0
+markdown>=3.0.0
+faiss-cpu>=1.7.0
 
 # Web Interfaces
 # =================================
 
 # FastAPI Backend (Production)
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-python-multipart>=0.0.6
-pydantic>=2.0.0
+fastapi>=0.120.0
+uvicorn>=0.38.0
+python-multipart>=0.0.20
+pydantic>=2.11.0
 
 # Utilities
 # =================================
-tqdm>=4.65.0
-pyyaml>=6.0
+tqdm>=4.67.0
+pyyaml>=6.0.0

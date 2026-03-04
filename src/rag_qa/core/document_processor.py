@@ -24,7 +24,7 @@ import markdown
 from bs4 import BeautifulSoup
 
 # LangChain
-from langchain.schema import Document
+from langchain_core.documents import Document
 from langchain_community.document_loaders import UnstructuredFileIOLoader
 
 # Local imports

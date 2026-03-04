@@ -7,9 +7,9 @@ that don't support native KNN indexing.
 
 import logging
 from typing import List, Any
-from langchain.schema import Document
-from langchain.callbacks.manager import CallbackManagerForRetrieverRun
-from langchain.schema import BaseRetriever
+from langchain_core.documents import Document
+from langchain_core.callbacks.manager import CallbackManagerForRetrieverRun
+from langchain_core.retrievers import BaseRetriever
 
 logger = logging.getLogger(__name__)
 

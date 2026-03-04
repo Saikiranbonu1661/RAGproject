@@ -7,7 +7,7 @@ Configuration loaded from config/config.yml.
 
 from typing import List, Optional
 from pydantic import BaseModel
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # Import config loader
 from ..utils.config_loader import get_text_splitter_config

@@ -15,7 +15,8 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # LangChain
-from langchain.schema import Document, HumanMessage
+from langchain_core.documents import Document
+from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
 # Local imports
